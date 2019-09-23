@@ -80,15 +80,16 @@ const projectSchema = mongoose.Schema({
         type: Date,
         default: Date.now
     },
-    likes: [{
-        userId: String,
-        name: String
-    }],
+    likes: [],
     comment: [{
         userId: String,
         name: String,
         commented: String
     }],
+    collectedMoney: {
+        type: Number,
+        default: 0
+    },
     donation: [{
         userId: String,
         name: String,
@@ -184,14 +185,7 @@ app.delete("/deleteProject/:id", checkAuth, (req, res) => {
 
 app.put("/likeProject/:id", checkAuth, (req, res) => {
 
-    projectCollection.updateOne({ _id: req.params.id }, {
-        $push: {
-            likes: {
-                "userId": req.body.userId,
-                "name": req.body.name
-            }
-        }
-    })
+    projectCollection.updateOne({ _id: req.params.id }, { $addToSet: { likes: req.body.userId } })
         .then(result => {
             if (result.n > 0) {
                 res.status(200).json({ message: "Like Successfull !" })
@@ -207,29 +201,54 @@ app.put("/likeProject/:id", checkAuth, (req, res) => {
 
 })
 
-app.put("/donation/:postId", checkAuth, (req,res) => {
-    console.log(req.body);
-    projectCollection.updateOne({_id: req.params.postId},{
-        $push: {
-            donation: {
-                "userId": req.body.userId,
-                "name": req.body.name,
-                "donated": req.body.donation
-            }
-        }
-    })
-    .then(result => {
-        if (result.n > 0) {
-            res.status(200).json({ message: "Donated Successfully !"});
-        } else {
-            res.status(401).json({message: "Not Authorized to Donate"});
-        }
-    })
-    .catch(error => {
-        res.status(500).json({
-            message: "Donation Failed !"
+app.put("/donation/:postId", checkAuth, (req, res) => {
+
+    projectCollection.updateOne({ _id: req.params.postId },
+        {
+            $push: {
+                donation: {
+                    "userId": req.body.userId,
+                    "name": req.body.name,
+                    "donated": req.body.donation
+                }
+            },
+            $inc: { collectedMoney: req.body.donation }
         })
-    })
+        .then(result => {
+            if (result.n > 0) {
+                res.status(200).json({ message: "Donated Successfully !" });
+            } else {
+                res.status(401).json({ message: "Not Authorized to Donate" });
+            }
+        })
+        .catch(error => {
+            res.status(500).json({
+                message: "Donation Failed !"
+            })
+        })
+});
+
+app.put("/commentProject/:postId", checkAuth, (req, res) => {
+    projectCollection.updateOne({ _id: req.params.postId },
+        {
+            $push: {
+                comment: {
+                    "userId": req.body.userId,
+                    "name": req.body.name,
+                    "commented": req.body.comment
+                }
+            }
+        })
+        .then(result => {
+            if (result.n > 0) {
+                res.status(200).json({ message: "Commented Successfully" });
+            } else {
+                res.status(401).json({ message: " Not Authorized to Comment" });
+            }
+        })
+        .catch(error => {
+            res.status(500).json({ message: "Comment Failed!" })
+        })
 })
 
 //User Collection//
