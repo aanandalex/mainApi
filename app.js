@@ -203,6 +203,11 @@ app.put("/likeProject/:id", checkAuth, (req, res) => {
 
 app.put("/donation/:postId", checkAuth, (req, res) => {
 
+    userCollection.updateOne({_id: req.body.userId},{$inc: {wallet: -req.body.donation}},(error,data) => {
+        if (error) {
+            console.log(error);
+        }
+    })
     projectCollection.updateOne({ _id: req.params.postId },
         {
             $push: {
@@ -226,6 +231,22 @@ app.put("/donation/:postId", checkAuth, (req, res) => {
                 message: "Donation Failed !"
             })
         })
+
+   
+
+    projectCollection.find({ $expr: { $gte: ["$collectedMoney", "$cost"] } }, { _id: 1, projectStatus: 1 }, (error, data) => {
+        if (error) {
+            console.log(error);
+        } else {
+            for (var i = 0; i < data.length; i++) {
+                projectCollection.updateOne({ _id: data[i]._id }, { projectStatus: "Success" }, (error, data) => {
+                    if (error) {
+                        console.log(error);
+                    }
+                })
+            }
+        }
+    })
 });
 
 app.put("/commentProject/:postId", checkAuth, (req, res) => {
@@ -350,6 +371,83 @@ app.post("/login", (req, res) => {
 
 })
 
+//User Services//
+app.get("/userProjects/:userId", checkAuth, (req, res) => {
+    console.log(req.params.userId);
+    projectCollection.find({ creatorId: req.params.userId })
+        .then(result => {
+            res.status(200).send(result);
+        })
+        .catch(error => {
+            res.status(500).json({ message: "error in fetching user created projects" });
+        })
+})
+
+app.get("/userDonations/:userId", checkAuth, (req, res) => {
+    console.log(req.params.userId);
+    projectCollection.find({ "donation": { $elemMatch: { userId: req.params.userId } } }, { _id: 1, creatorName: 1, title: 1, projectStatus: 1, cost: 1, collectedMoney: 1, "donation.donated": 1 })
+        .then(result => {
+            res.status(200).send(result);
+        })
+        .catch(error => {
+            res.status(500).json("user donation can be found");
+        })
+})
+
+app.get("/userWallet/:userId", checkAuth, (req, res) => {
+    console.log(req.params.userId);
+    userCollection.find({ _id: req.params.userId }, { wallet: 1, _id: 0 })
+        .then(result => {
+            console.log(result);
+            res.status(200).send(result);
+        })
+        .catch(error => {
+            res.status(500).json("user wallet cant be found");
+        })
+})
+
+app.put("/topup/:userId", checkAuth, (req, res) => {
+
+    userCollection.updateOne({ _id: req.params.userId }, { $inc: { wallet: req.body.money } })
+        .then(result => {
+            res.status(200).json("top up Successful");
+        })
+        .catch(error => {
+            res.status(500).json("error in topup");
+        })
+})
+
+//dashBoard pie Chart//
+app.get("/crowdFunding", (req, res) => {
+    projectCollection.find({ projectStatus: { $eq: "Started Crowd Funding" } }, { _id: 1 })
+        .then(result => {
+            res.status(200).send(result);
+        })
+        .catch(error => {
+            res.status(500).json("error in fetching started crowdfunding details for pie chart");
+        })
+})
+
+app.get("/success", (req, res) => {
+    projectCollection.find({ projectStatus: { $eq: "Success" } }, { _id: 1 })
+        .then(result => {
+            res.status(200).send(result);
+        })
+        .catch(error => {
+            res.status(500).json("error in fetching Success details for pei chart")
+        })
+})
+
+app.get("/totalProject", (req, res) => {
+    projectCollection.find({}, { _id: 1 })
+        .then(result => {
+            res.status(200).send(result);
+        })
+        .catch(error => {
+            res.status(500).json("error in fetching total project for pie chart");
+        })
+})
+
 //Api server//
 app.get("/", (req, res) => {
     res.send("Welcome to CrowdFunding Api");
@@ -358,3 +456,4 @@ app.get("/", (req, res) => {
 app.listen(process.env.PORT || 3000, () => {
     console.log("Server is Up and listening");
 })
+
